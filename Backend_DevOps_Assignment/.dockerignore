@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+Backend_DevOps_Assignment.pdf
+codex_master_prompt.md
+
