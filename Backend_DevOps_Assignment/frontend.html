@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Processing Pipeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card h2::before {
+            font-size: 1.3em;
+        }
+
+        .upload-card h2::before { content: "📤"; }
+        .status-card h2::before { content: "📋"; }
+        .results-card h2::before { content: "📊"; }
+        .jobs-card h2::before { content: "📑"; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 0.95em;
+        }
+
+        input[type="file"],
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+        }
+
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.secondary {
+            background: #f5f5f5;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        button.secondary:hover {
+            background: #f0f0f0;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .output-section {
+            margin-top: 30px;
+        }
+
+        .output-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .output {
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .output.error {
+            background: #ffebee;
+            border-color: #ef5350;
+            color: #c62828;
+        }
+
+        .output.success {
+            background: #e8f5e9;
+            border-color: #66bb6a;
+            color: #2e7d32;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-processing { background: #cfe2ff; color: #084298; }
+        .status-completed { background: #d1e7dd; color: #0f5132; }
+        .status-failed { background: #f8d7da; color: #842029; }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+        }
+
+        tr:hover {
+            background: #fafafa;
+        }
+
+        .json-output {
+            display: none;
+        }
+
+        .json-output.active {
+            display: block;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .filter-group select {
+            flex: 1;
+        }
+
+        .filter-group button {
+            flex: 0;
+        }
+
+        .base-url-info {
+            background: #e3f2fd;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #1565c0;
+        }
+
+        .copy-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+
+        .copy-button:hover {
+            background: #764ba2;
+        }
+
+        .job-id-display {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Transaction Processing Pipeline</h1>
+            <p>Upload CSVs, analyze transactions, and generate financial summaries with AI</p>
+        </div>
+
+        <div class="base-url-info">
+            <strong>API Base URL:</strong> <span id="baseUrl">http://localhost:8000</span>
+            <button class="copy-button" onclick="copyToClipboard()">Copy</button>
+            <br>
+            <small>Change it if your API is running on a different port</small>
+        </div>
+
+        <div class="grid">
+            <!-- UPLOAD CSV -->
+            <div class="card upload-card">
+                <h2>Upload CSV File</h2>
+                <div class="form-group">
+                    <label for="csvFile">Select Transaction CSV</label>
+                    <input type="file" id="csvFile" accept=".csv" />
+                    <small style="color: #666; display: block; margin-top: 5px;">
+                        Required columns: txn_id, date, merchant, amount, currency, status, category, account_id, notes
+                    </small>
+                </div>
+                <div class="button-group">
+                    <button onclick="uploadCSV()">Upload & Process</button>
+                </div>
+                <div class="loading" id="uploadLoading">
+                    <span class="spinner"></span> Processing...
+                </div>
+                <div class="output-section" id="uploadOutput" style="display: none;">
+                    <h3>Upload Response</h3>
+                    <div class="output" id="uploadResult"></div>
+                    <div class="job-id-display" id="jobIdDisplay" style="display: none;">
+                        <strong>Job ID:</strong> <span id="jobIdValue"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GET JOB STATUS -->
+            <div class="card status-card">
+                <h2>Get Job Status</h2>
+                <div class="form-group">
+                    <label for="statusJobId">Job ID</label>
+                    <input type="text" id="statusJobId" placeholder="Enter job ID..." />
+                </div>
+                <div class="button-group">
+                    <button onclick="getJobStatus()">Check Status</button>
+                </div>
+                <div class="loading" id="statusLoading">
+                    <span class="spinner"></span> Loading...
+                </div>
+                <div class="output-section" id="statusOutput" style="display: none;">
+                    <h3>Status Response</h3>
+                    <div class="output" id="statusResult"></div>
+                </div>
+            </div>
+
+            <!-- GET JOB RESULTS -->
+            <div class="card results-card">
+                <h2>Get Job Results</h2>
+                <div class="form-group">
+                    <label for="resultsJobId">Job ID</label>
+                    <input type="text" id="resultsJobId" placeholder="Enter job ID..." />
+                </div>
+                <div class="button-group">
+                    <button onclick="getJobResults()">Get Results</button>
+                </div>
+                <div class="loading" id="resultsLoading">
+                    <span class="spinner"></span> Loading...
+                </div>
+                <div class="output-section" id="resultsOutput" style="display: none;">
+                    <h3>Results Response</h3>
+                    <div class="output" id="resultsResult"></div>
+                </div>
+            </div>
+
+            <!-- GET ALL JOBS -->
+            <div class="card jobs-card">
+                <h2>Get All Jobs</h2>
+                <div class="form-group">
+                    <label for="statusFilter">Filter by Status (optional)</label>
+                    <select id="statusFilter">
+                        <option value="">All Jobs</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                <div class="button-group">
+                    <button onclick="getAllJobs()">Get All Jobs</button>
+                </div>
+                <div class="loading" id="jobsLoading">
+                    <span class="spinner"></span> Loading...
+                </div>
+                <div class="output-section" id="jobsOutput" style="display: none;">
+                    <h3>All Jobs</h3>
+                    <div class="table-wrapper" id="jobsTableWrapper" style="display: none;"></div>
+                    <div class="output" id="jobsResult"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+
+        // Update base URL if needed
+        document.getElementById('baseUrl').textContent = API_BASE_URL;
+
+        function copyToClipboard() {
+            const text = document.getElementById('baseUrl').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied: ' + text);
+            });
+        }
+
+        function showOutput(elementId, data, isError = false) {
+            const output = document.getElementById(elementId);
+            const container = output.closest('.output-section');
+            const resultDiv = output;
+            
+            container.style.display = 'block';
+            resultDiv.className = 'output' + (isError ? ' error' : ' success');
+            resultDiv.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function hideLoading(elementId) {
+            document.getElementById(elementId).classList.remove('active');
+        }
+
+        function showLoading(elementId) {
+            document.getElementById(elementId).classList.add('active');
+        }
+
+        // UPLOAD CSV
+        async function uploadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a CSV file');
+                return;
+            }
+
+            showLoading('uploadLoading');
+            document.getElementById('uploadOutput').style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${API_BASE_URL}/jobs/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showOutput('uploadResult', data, true);
+                } else {
+                    showOutput('uploadResult', data, false);
+                    // Display job ID prominently
+                    if (data.job_id) {
+                        document.getElementById('jobIdValue').textContent = data.job_id;
+                        document.getElementById('jobIdDisplay').style.display = 'block';
+                        document.getElementById('statusJobId').value = data.job_id;
+                        document.getElementById('resultsJobId').value = data.job_id;
+                    }
+                }
+                document.getElementById('uploadOutput').style.display = 'block';
+            } catch (error) {
+                showOutput('uploadResult', { error: error.message }, true);
+                document.getElementById('uploadOutput').style.display = 'block';
+            } finally {
+                hideLoading('uploadLoading');
+            }
+        }
+
+        // GET JOB STATUS
+        async function getJobStatus() {
+            const jobId = document.getElementById('statusJobId').value.trim();
+
+            if (!jobId) {
+                alert('Please enter a Job ID');
+                return;
+            }
+
+            showLoading('statusLoading');
+            document.getElementById('statusOutput').style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/status`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showOutput('statusResult', data, true);
+                } else {
+                    showOutput('statusResult', data, false);
+                }
+                document.getElementById('statusOutput').style.display = 'block';
+            } catch (error) {
+                showOutput('statusResult', { error: error.message }, true);
+                document.getElementById('statusOutput').style.display = 'block';
+            } finally {
+                hideLoading('statusLoading');
+            }
+        }
+
+        // GET JOB RESULTS
+        async function getJobResults() {
+            const jobId = document.getElementById('resultsJobId').value.trim();
+
+            if (!jobId) {
+                alert('Please enter a Job ID');
+                return;
+            }
+
+            showLoading('resultsLoading');
+            document.getElementById('resultsOutput').style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/results`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showOutput('resultsResult', data, true);
+                } else {
+                    showOutput('resultsResult', data, false);
+                }
+                document.getElementById('resultsOutput').style.display = 'block';
+            } catch (error) {
+                showOutput('resultsResult', { error: error.message }, true);
+                document.getElementById('resultsOutput').style.display = 'block';
+            } finally {
+                hideLoading('resultsLoading');
+            }
+        }
+
+        // GET ALL JOBS
+        async function getAllJobs() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const url = statusFilter 
+                ? `${API_BASE_URL}/jobs?status=${statusFilter}`
+                : `${API_BASE_URL}/jobs`;
+
+            showLoading('jobsLoading');
+            document.getElementById('jobsOutput').style.display = 'none';
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showOutput('jobsResult', data, true);
+                    document.getElementById('jobsTableWrapper').style.display = 'none';
+                } else {
+                    // Check if data is an array
+                    if (Array.isArray(data) && data.length > 0) {
+                        generateJobsTable(data);
+                        document.getElementById('jobsTableWrapper').style.display = 'block';
+                    } else {
+                        document.getElementById('jobsTableWrapper').style.display = 'none';
+                    }
+                    showOutput('jobsResult', data, false);
+                }
+                document.getElementById('jobsOutput').style.display = 'block';
+            } catch (error) {
+                showOutput('jobsResult', { error: error.message }, true);
+                document.getElementById('jobsOutput').style.display = 'block';
+            } finally {
+                hideLoading('jobsLoading');
+            }
+        }
+
+        function generateJobsTable(jobs) {
+            let html = '<table><thead><tr>';
+            html += '<th>Job ID</th>';
+            html += '<th>Filename</th>';
+            html += '<th>Status</th>';
+            html += '<th>Created (Local Time)</th>';
+            html += '<th>Created (UTC)</th>';
+            html += '<th>Rows</th>';
+            html += '</tr></thead><tbody>';
+
+            jobs.forEach(job => {
+                const statusClass = `status-${job.status}`;
+                const createdDate = new Date(job.created_at);
+                const localTime = createdDate.toLocaleString();
+                const utcTime = createdDate.toUTCString();
+                
+                html += '<tr>';
+                html += `<td style="font-family: monospace; font-size: 0.85em;">${job.job_id}</td>`;
+                html += `<td>${job.filename || 'N/A'}</td>`;
+                html += `<td><span class="status-badge ${statusClass}">${job.status}</span></td>`;
+                html += `<td title="${utcTime}">${localTime}</td>`;
+                html += `<td style="font-size: 0.85em;">${utcTime}</td>`;
+                html += `<td>${job.row_count_raw || 0}</td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('jobsTableWrapper').innerHTML = html;
+        }
+
+        // Keyboard shortcuts
+        document.getElementById('csvFile').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') uploadCSV();
+        });
+
+        document.getElementById('statusJobId').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') getJobStatus();
+        });
+
+        document.getElementById('resultsJobId').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') getJobResults();
+        });
+    </script>
+</body>
+</html>
