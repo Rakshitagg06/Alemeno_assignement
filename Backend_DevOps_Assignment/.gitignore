@@ -8,4 +8,7 @@ venv/
 *.egg-info/
 dist/
 build/
+transactions.csv
+codex_master_prompt
+Backend_DevOps_Assignment
 

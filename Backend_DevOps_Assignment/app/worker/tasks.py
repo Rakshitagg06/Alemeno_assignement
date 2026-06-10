@@ -44,6 +44,13 @@ def _float_or_zero(value: object) -> float:
     return float(value)
 
 
+def _category_needs_llm(value: object) -> bool:
+    value = _none_if_na(value)
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "uncategorised", "uncategorized", "nan", "none", "null"}
+
+
 def _set_failed(db: Session, job: models.Job | None, error: Exception) -> None:
     if job is None:
         return
@@ -63,7 +70,7 @@ def _classify_uncategorised(db: Session, transactions: list[models.Transaction])
             "currency": transaction.currency,
         }
         for index, transaction in enumerate(transactions)
-        if transaction.category == "Uncategorised"
+        if _category_needs_llm(transaction.category)
     ]
     if not uncategorised:
         logger.info("No uncategorised transactions to classify")
@@ -82,6 +89,7 @@ def _classify_uncategorised(db: Session, transactions: list[models.Transaction])
 
     try:
         results, raw_response = classify_transactions(payload)
+        updated_indexes: set[int] = set()
         for result in results:
             transaction = by_index.get(result["txn_index"])
             if transaction is None:
@@ -89,12 +97,25 @@ def _classify_uncategorised(db: Session, transactions: list[models.Transaction])
             transaction.llm_category = result["category"]
             transaction.category = result["category"]
             transaction.llm_raw_response = raw_response
+            updated_indexes.add(result["txn_index"])
+
+        missing_indexes = set(by_index) - updated_indexes
+        for missing_index in missing_indexes:
+            transaction = by_index[missing_index]
+            transaction.llm_category = "Other"
+            transaction.category = "Other"
+            transaction.llm_raw_response = raw_response
+            transaction.llm_failed = True
+        if missing_indexes:
+            logger.warning("LLM omitted %s transactions; defaulted them to Other", len(missing_indexes))
+
         db.commit()
-        logger.info("Classified %s uncategorised transactions", len(results))
+        logger.info("Classified %s transactions with missing categories", len(updated_indexes))
     except Exception as exc:
         logger.warning("LLM classification failed; continuing job: %s", exc)
         for item in uncategorised:
             item["transaction"].llm_failed = True
+            item["transaction"].category = "Other"
         db.commit()
 
 

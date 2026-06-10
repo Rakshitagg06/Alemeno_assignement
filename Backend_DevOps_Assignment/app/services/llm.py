@@ -94,6 +94,7 @@ Food, Shopping, Travel, Transport, Utilities, Cash Withdrawal, Entertainment, Ot
 
 Return ONLY a valid JSON array with no extra text, markdown, or explanation.
 Each element must be an object: {{"txn_index": <int>, "category": "<category>"}}
+Return exactly one object for every transaction listed below.
 
 Transactions to classify:
 {json.dumps(payload, ensure_ascii=True)}
