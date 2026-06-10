@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
@@ -56,7 +56,7 @@ def _set_failed(db: Session, job: models.Job | None, error: Exception) -> None:
         return
     job.status = "failed"
     job.error_message = str(error)
-    job.completed_at = datetime.utcnow()
+    job.completed_at = datetime.now(timezone.utc)
     db.commit()
 
 
@@ -314,7 +314,7 @@ def process_job(job_id: str, filepath: str) -> None:
         _create_summary(db, job_uuid, len(transactions))
 
         job.status = "completed"
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(timezone.utc)
         job.row_count_clean = len(transactions)
         job.error_message = None
         db.commit()

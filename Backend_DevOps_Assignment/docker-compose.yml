@@ -29,7 +29,7 @@ services:
       - .env
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - uploaded_files:/tmp/uploads
     depends_on:

@@ -108,6 +108,69 @@ Expected response format:
 }
 ```
 
+## Web Frontend
+
+A clean, minimal web interface is provided to interact with the API without using curl commands.
+
+### Features
+
+- 📤 **Upload CSV Files** - Select and upload transaction CSVs for processing
+- 📋 **Check Job Status** - Monitor processing status by Job ID
+- 📊 **View Job Results** - Retrieve summaries, anomalies, and categorized transactions
+- 📑 **List All Jobs** - Browse all jobs with optional status filtering (pending/processing/completed/failed)
+- 🎨 **Clean UI** - Modern, responsive design with real-time status updates
+- ⚡ **No Authentication** - Quick access for testing and development
+
+### Running the Frontend
+
+1. **Open the HTML file directly in your browser:**
+   ```bash
+   # On Linux/macOS
+   open ../frontend.html
+   
+   # On Linux with file manager
+   xdg-open ../frontend.html
+   
+   # Or simply double-click the file in your file explorer
+   ```
+
+2. **Make sure the backend is running:**
+   ```bash
+   docker compose up --build
+   ```
+
+3. **The frontend will connect to the API** at `http://localhost:8001` (configurable in the interface)
+
+### Frontend Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| Upload CSV | Select a CSV file with required columns and submit for processing |
+| Job Status | Check real-time processing status, row counts, and error messages |
+| Job Results | View final summary (spend totals, top merchants, risk level), anomalies, and categorization breakdown |
+| Job Listing | Display all jobs in a sortable table with status badges and timestamps |
+
+### CSV File Requirements
+
+The CSV must contain exactly these 9 columns:
+- `txn_id` - Transaction ID
+- `date` - Transaction date
+- `merchant` - Merchant name
+- `amount` - Transaction amount
+- `currency` - Currency (INR, USD, etc.)
+- `status` - Transaction status (SUCCESS, FAILED, etc.)
+- `category` - Transaction category (or leave blank for auto-classification)
+- `account_id` - Account identifier
+- `notes` - Additional notes
+
+### Example Workflow
+
+1. Click **"Upload CSV File"** and select your transaction file
+2. Submit the form and receive a **Job ID**
+3. Use the **Job ID** to check status or retrieve results
+4. View the financial analysis with AI-generated insights
+5. Filter and browse all jobs using the job listing
+
 ## Notes
 
 Gemini calls are retried three times with exponential backoff. If classification fails, the job continues and marks the affected rows with `llm_failed=true`. If narrative generation fails, the service stores a deterministic local summary so the job can still complete.
